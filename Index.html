@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AI Mouse Debug 🐭</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    min-height:100vh;
+    background: radial-gradient(ellipse at 30% 20%, #1e0a3c 0%, #0d0620 55%, #040210 100%);
+    display:flex; flex-direction:column; align-items:center;
+    font-family:'Nunito',sans-serif; padding:20px 16px 40px; gap:12px;
+    color:white;
+  }
+  .title { font-family:'Fredoka One',cursive; font-size:1.8rem; text-shadow:0 0 30px rgba(168,85,247,0.9); }
+
+/* Mouse */
+.mouse-wrap { width:150px; height:180px; }
+svg.mouse { width:100%; height:100%; filter:drop-shadow(0 8px 20px rgba(168,85,247,0.35)); }
+.mbg { animation:bob 2.2s ease-in-out infinite; transform-origin:center bottom; }
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+.tail { animation:wag 1.8s ease-in-out infinite; transform-origin:50% 0; }
+@keyframes wag { 0%,100%{transform:rotate(-10deg)} 50%{transform:rotate(10deg)} }
+.el { animation:earL 3.5s ease-in-out infinite; transform-origin:center bottom; }
+.er { animation:earR 3.5s ease-in-out infinite; transform-origin:center bottom; }
+@keyframes earL { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-12deg)} 75%{transform:rotate(6deg)} }
+@keyframes earR { 0%,100%{transform:rotate(0)} 25%{transform:rotate(12deg)} 75%{transform:rotate(-6deg)} }
+.eyl { animation:blink 4s ease-in-out infinite; transform-origin:center; }
+.eyr { animation:blink 4s ease-in-out infinite 0.1s; transform-origin:center; }
+@keyframes blink { 0%,44%,56%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.05)} }
+.blush { animation:bp 2s ease-in-out infinite; }
+@keyframes bp { 0%,100%{opacity:0.55} 50%{opacity:0.85} }
+.speaking .mbg { animation:sbob 0.25s ease-in-out infinite; }
+@keyframes sbob { 0%,100%{transform:translateY(0) rotate(-1.5deg)} 50%{transform:translateY(-5px) rotate(1.5deg)} }
+
+/* Key input */
+.panel {
+width:100%; max-width:380px;
+background:rgba(255,255,255,0.05);
+border:1.5px solid rgba(168,85,247,0.3);
+border-radius:16px; padding:14px 16px;
+}
+.label { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#a855f7; margin-bottom:8px; }
+.row { display:flex; gap:8px; }
+input[type=password], input[type=text] {
+flex:1; padding:10px 14px; border-radius:10px;
+border:1.5px solid rgba(168,85,247,0.35);
+background:rgba(0,0,0,0.3); color:white;
+font-family:‘Nunito’,sans-serif; font-size:13px; outline:none;
+}
+input:focus { border-color:#a855f7; }
+
+/* Voice chips */
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.chip {
+padding:5px 13px; border-radius:20px;
+border:1.5px solid rgba(255,255,255,0.15);
+background:transparent; color:rgba(255,255,255,0.55);
+font-family:‘Nunito’,sans-serif; font-size:12px; font-weight:700;
+cursor:pointer; touch-action:manipulation;
+}
+.chip.active { background:rgba(168,85,247,0.25); border-color:#a855f7; color:white; }
+
+textarea {
+width:100%; max-width:380px;
+padding:12px 15px; border-radius:12px;
+border:2px solid rgba(168,85,247,0.35);
+background:rgba(255,255,255,0.07); color:white;
+font-family:‘Nunito’,sans-serif; font-size:14px; font-weight:700;
+outline:none; resize:none; line-height:1.5;
+}
+textarea:focus { border-color:rgba(168,85,247,0.8); }
+
+.btn {
+width:100%; max-width:380px; padding:15px;
+border-radius:50px; border:none;
+font-family:‘Fredoka One’,cursive; font-size:1.1rem;
+cursor:pointer; touch-action:manipulation;
+transition:transform 0.1s;
+}
+.btn:active { transform:scale(0.96); }
+.btn-speak { background:linear-gradient(135deg,#a855f7,#7c3aed); color:white; box-shadow:0 6px 28px rgba(168,85,247,0.5); }
+.btn-speak:disabled { opacity:0.45; }
+.btn-stop { background:transparent; color:rgba(239,68,68,0.9); border:2px solid rgba(239,68,68,0.5); display:none; }
+.btn-save { padding:10px 15px; border-radius:10px; border:none; background:rgba(168,85,247,0.25); color:#a855f7; border:1px solid rgba(168,85,247,0.4); font-family:‘Fredoka One’,cursive; font-size:13px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
+
+/* ── DEBUG PANEL ── */
+.debug-panel {
+width:100%; max-width:380px;
+background:rgba(0,0,0,0.6);
+border:1.5px solid rgba(0,255,100,0.3);
+border-radius:14px; padding:12px 14px;
+}
+.debug-title {
+font-size:11px; font-weight:800; text-transform:uppercase;
+letter-spacing:1px; color:#00ff64; margin-bottom:8px;
+display:flex; justify-content:space-between; align-items:center;
+}
+.debug-clear { font-size:10px; color:rgba(255,255,255,0.3); cursor:pointer; font-weight:400; text-transform:none; letter-spacing:0; }
+#debugLog {
+font-family:monospace; font-size:11px; line-height:1.7;
+max-height:200px; overflow-y:auto;
+-webkit-overflow-scrolling:touch;
+}
+.log-ok   { color:#4ade80; }
+.log-err  { color:#f87171; }
+.log-info { color:#93c5fd; }
+.log-warn { color:#fbbf24; }
+
+.spinner { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:5px; vertical-align:middle; }
+@keyframes spin { to{transform:rotate(360deg)} }
+</style>
+
+</head>
+<body>
+
+<div class="title">🐭 Mickey Mouseman</div>
+
+<!-- Mouse SVG -->
+
+<div class="mouse-wrap" id="mouseWrap">
+  <svg class="mouse" viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="bG" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#d4a0c8"/><stop offset="100%" stop-color="#9a5a8e"/></radialGradient>
+      <radialGradient id="bly" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#f0d0e8"/><stop offset="100%" stop-color="#e0b0d0"/></radialGradient>
+      <radialGradient id="eI" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f9a8d4"/><stop offset="100%" stop-color="#ec4899"/></radialGradient>
+      <radialGradient id="nG" cx="40%" cy="30%" r="60%"><stop offset="0%" stop-color="#fda4af"/><stop offset="100%" stop-color="#e11d48"/></radialGradient>
+      <filter id="gl"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <g class="tail"><path d="M 100 212 Q 162 232 172 200 Q 182 168 156 158" fill="none" stroke="#c084a8" stroke-width="5" stroke-linecap="round"/></g>
+    <g class="mbg" id="mbg">
+      <g class="el"><ellipse cx="58" cy="62" rx="32" ry="28" fill="url(#bG)"/><ellipse cx="58" cy="64" rx="20" ry="17" fill="url(#eI)" opacity="0.8"/></g>
+      <g class="er"><ellipse cx="142" cy="62" rx="32" ry="28" fill="url(#bG)"/><ellipse cx="142" cy="64" rx="20" ry="17" fill="url(#eI)" opacity="0.8"/></g>
+      <ellipse cx="100" cy="170" rx="55" ry="65" fill="url(#bG)"/>
+      <ellipse cx="100" cy="178" rx="32" ry="42" fill="url(#bly)"/>
+      <ellipse cx="100" cy="110" rx="52" ry="50" fill="url(#bG)"/>
+      <ellipse cx="85" cy="90" rx="18" ry="14" fill="rgba(255,255,255,0.12)" transform="rotate(-20,85,90)"/>
+      <ellipse class="blush" cx="68" cy="122" rx="12" ry="8" fill="#f472b6" opacity="0.6"/>
+      <ellipse class="blush" cx="132" cy="122" rx="12" ry="8" fill="#f472b6" opacity="0.6"/>
+      <g class="eyl"><ellipse cx="84" cy="105" rx="10" ry="11" fill="#1a1a2e"/><ellipse cx="87" cy="101" rx="3.5" ry="3.5" fill="white" opacity="0.9"/><circle cx="80" cy="108" r="1.5" fill="white" opacity="0.5"/></g>
+      <g class="eyr"><ellipse cx="116" cy="105" rx="10" ry="11" fill="#1a1a2e"/><ellipse cx="119" cy="101" rx="3.5" ry="3.5" fill="white" opacity="0.9"/><circle cx="112" cy="108" r="1.5" fill="white" opacity="0.5"/></g>
+      <ellipse cx="100" cy="118" rx="7" ry="5" fill="url(#nG)"/>
+      <ellipse cx="98" cy="116" rx="2" ry="1.5" fill="rgba(255,255,255,0.4)"/>
+      <line x1="50" y1="118" x2="88" y2="120" stroke="rgba(180,140,170,0.6)" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="48" y1="124" x2="88" y2="123" stroke="rgba(180,140,170,0.6)" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="150" y1="118" x2="112" y2="120" stroke="rgba(180,140,170,0.6)" stroke-width="1.2" stroke-linecap="round"/>
+      <line x1="152" y1="124" x2="112" y2="123" stroke="rgba(180,140,170,0.6)" stroke-width="1.2" stroke-linecap="round"/>
+      <path id="mSmile" d="M 88 130 Q 100 141 112 130" fill="none" stroke="#7a3060" stroke-width="2.5" stroke-linecap="round"/>
+      <g id="mOpen" style="display:none">
+        <ellipse id="mEll" cx="100" cy="132" rx="11" ry="1" fill="#3a0830"/>
+        <path d="M 89 129 Q 100 137 111 129" fill="none" stroke="#7a3060" stroke-width="2" stroke-linecap="round"/>
+      </g>
+      <path d="M 55 155 Q 30 140 28 160 Q 26 175 45 180" fill="url(#bG)"/>
+      <path d="M 145 155 Q 170 140 172 160 Q 174 175 155 180" fill="url(#bG)"/>
+      <ellipse cx="75" cy="228" rx="14" ry="8" fill="url(#bG)"/>
+      <ellipse cx="125" cy="228" rx="14" ry="8" fill="url(#bG)"/>
+      <path d="M 92 85 Q 96 78 100 85 Q 104 78 108 85 Q 104 92 100 85 Q 96 92 92 85" fill="#f472b6" filter="url(#gl)"/>
+    </g>
+  </svg>
+</div>
+
+<!-- Key Panel -->
+
+<div class="panel">
+  <div class="label">🔑 OpenAI API Key</div>
+  <div class="row">
+    <input type="password" id="apiKey" placeholder="sk-..."/>
+    <button class="btn-save" onclick="saveKey()">Save</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<textarea id="textInput" rows="2" placeholder="What should the mouse say?">Hi! I am a little mouse and I love cheese so much!</textarea>
+
+<button class="btn btn-speak" id="speakBtn" onclick="speakNow()">🎤 Tap to Speak!</button>
+<button class="btn btn-stop" id="stopBtn" onclick="stopNow()">⏹ Stop</button>
+
+<!-- DEBUG PANEL -->
+
+<div class="debug-panel">
+  <div class="debug-title">
+    🔍 Debug Log
+    <span class="debug-clear" onclick="clearLog()">Clear</span>
+  </div>
+  <div id="debugLog"><span class="log-info">Waiting... tap Speak to start.</span></div>
+</div>
+
+<script>
+// ── Logger ──
+function log(msg, type='info') {
+  const el = document.getElementById('debugLog');
+  const line = document.createElement('div');
+  line.className = `log-${type}`;
+  const time = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const icons = { ok:'✅', err:'❌', info:'ℹ️', warn:'⚠️' };
+  line.textContent = `${icons[type]||'•'} [${time}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  console.log(`[${type}] ${msg}`);
+}
+function clearLog() {
+  document.getElementById('debugLog').innerHTML = '<span class="log-info">Log cleared.</span>';
+}
+
+// ── Startup diagnostics ──
+log(`Browser: ${navigator.userAgent.slice(0,80)}`, 'info');
+log(`Platform: ${navigator.platform}`, 'info');
+log(`Audio support: ${!!window.Audio}`, window.Audio ? 'ok' : 'err');
+
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+log(`iOS detected: ${isIOS}`, isIOS ? 'warn' : 'info');
+
+// Test fetch availability
+if (typeof fetch !== 'undefined') log('fetch API: available', 'ok');
+else log('fetch API: NOT available!', 'err');
+
+// ── State ──
+const VOICES = [
+  { id:'nova', label:'✨ Nova' },
+  { id:'shimmer', label:'💫 Shimmer' },
+  { id:'alloy', label:'🎙 Alloy' },
+  { id:'echo', label:'🔊 Echo' },
+  { id:'fable', label:'📖 Fable' },
+  { id:'onyx', label:'🖤 Onyx' },
+];
+
+let apiKey = localStorage.getItem('oai_key') || '';
+let selectedVoice = localStorage.getItem('oai_voice') || 'nova';
+let currentAudio = null;
+let lipInterval = null;
+let mouthPhase = 0;
+
+// Build voice chips
+const chipsEl = document.getElementById('chips');
+VOICES.forEach(v => {
+  const btn = document.createElement('button');
+  btn.className = 'chip' + (v.id === selectedVoice ? ' active' : '');
+  btn.textContent = v.label;
+  btn.onclick = () => {
+    selectedVoice = v.id;
+    localStorage.setItem('oai_voice', v.id);
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    log(`Voice selected: ${v.id}`, 'info');
+  };
+  chipsEl.appendChild(btn);
+});
+
+if (apiKey) {
+  document.getElementById('apiKey').value = apiKey;
+  log('Saved API key loaded from storage', 'ok');
+}
+
+function saveKey() {
+  apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { log('No key entered', 'warn'); return; }
+  localStorage.setItem('oai_key', apiKey);
+  log(`API key saved (starts with: ${apiKey.slice(0,7)}...)`, 'ok');
+}
+
+// ── Speak ──
+async function speakNow() {
+  log('--- Speak tapped ---', 'info');
+
+  if (!apiKey) {
+    log('No API key! Paste your key and tap Save first.', 'err');
+    return;
+  }
+  log(`Using key: ${apiKey.slice(0,7)}...`, 'info');
+
+  const text = document.getElementById('textInput').value.trim();
+  if (!text) { log('No text entered', 'warn'); return; }
+  log(`Text: "${text.slice(0,50)}"`, 'info');
+  log(`Voice: ${selectedVoice}`, 'info');
+
+  stopNow();
+
+  const btn = document.getElementById('speakBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating...';
+
+  // Step 1: Fetch from OpenAI
+  log('Calling OpenAI TTS API...', 'info');
+  let blob;
+  try {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'tts-1',
+        input: text,
+        voice: selectedVoice,
+        speed: 0.95
+      })
+    });
+
+    log(`API response status: ${res.status} ${res.statusText}`, res.ok ? 'ok' : 'err');
+
+    if (!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        errMsg = errJson?.error?.message || errMsg;
+        log(`API error detail: ${JSON.stringify(errJson).slice(0,150)}`, 'err');
+      } catch(e) {
+        log(`Could not parse error body: ${e.message}`, 'warn');
+      }
+      throw new Error(errMsg);
+    }
+
+    blob = await res.blob();
+    log(`Audio blob received: ${blob.size} bytes, type: ${blob.type}`, 'ok');
+
+  } catch(e) {
+    log(`Fetch failed: ${e.message}`, 'err');
+    if (e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
+      log('Possible cause: No internet, or CORS blocked by browser', 'warn');
+      log('Try: Make sure you have internet on iPhone', 'warn');
+    }
+    if (e.message.includes('401') || e.message.toLowerCase().includes('invalid')) {
+      log('Invalid API key — check it at platform.openai.com', 'warn');
+    }
+    btn.innerHTML = '🎤 Tap to Speak!';
+    btn.disabled = false;
+    return;
+  }
+
+  // Step 2: Create blob URL
+  let url;
+  try {
+    url = URL.createObjectURL(blob);
+    log(`Blob URL created: ${url.slice(0,40)}...`, 'ok');
+  } catch(e) {
+    log(`createObjectURL failed: ${e.message}`, 'err');
+    btn.innerHTML = '🎤 Tap to Speak!';
+    btn.disabled = false;
+    return;
+  }
+
+  // Step 3: Create Audio element
+  log('Creating Audio element...', 'info');
+  let audio;
+  try {
+    audio = new Audio(url);
+    currentAudio = audio;
+    log('Audio element created', 'ok');
+  } catch(e) {
+    log(`Audio creation failed: ${e.message}`, 'err');
+    btn.innerHTML = '🎤 Tap to Speak!';
+    btn.disabled = false;
+    return;
+  }
+
+  // Step 4: Wire events
+  audio.onloadstart  = () => log('Audio: loadstart', 'info');
+  audio.onloadeddata = () => log('Audio: loadeddata — data loaded', 'ok');
+  audio.oncanplay    = () => log('Audio: canplay — ready to play', 'ok');
+  audio.oncanplaythrough = () => {
+    log('Audio: canplaythrough — attempting play()', 'info');
+    audio.play().then(() => {
+      log('audio.play() resolved — playback started!', 'ok');
+    }).catch(e => {
+      log(`audio.play() rejected: ${e.name}: ${e.message}`, 'err');
+      if (e.name === 'NotAllowedError') {
+        log('iOS blocked autoplay. Tap the page/button first to unlock audio.', 'warn');
+      }
+      btn.innerHTML = '🎤 Tap to Speak!';
+      btn.disabled = false;
+    });
+  };
+  audio.onplay    = () => { log('Audio: playing ▶', 'ok'); startLipSync(); btn.innerHTML='🎤 Tap to Speak!'; btn.disabled=false; document.getElementById('stopBtn').style.display='block'; };
+  audio.onpause   = () => log('Audio: paused ⏸', 'warn');
+  audio.onstalled = () => log('Audio: stalled — network issue?', 'warn');
+  audio.onwaiting = () => log('Audio: waiting for data...', 'warn');
+  audio.onerror   = (e) => {
+    const codes = {1:'ABORTED',2:'NETWORK',3:'DECODE',4:'SRC_NOT_SUPPORTED'};
+    const code = audio.error ? codes[audio.error.code] || audio.error.code : 'unknown';
+    log(`Audio error: ${code} — ${audio.error?.message || 'no message'}`, 'err');
+    if (code === 'SRC_NOT_SUPPORTED') log('Audio format not supported on this device/browser', 'warn');
+    stopLipSync();
+    btn.innerHTML = '🎤 Tap to Speak!';
+    btn.disabled = false;
+  };
+  audio.onended = () => {
+    log('Audio: finished ✓', 'ok');
+    stopLipSync();
+    document.getElementById('stopBtn').style.display = 'none';
+    URL.revokeObjectURL(url);
+    currentAudio = null;
+  };
+
+  // Step 5: Load
+  try {
+    log('Calling audio.load()...', 'info');
+    audio.load();
+  } catch(e) {
+    log(`audio.load() error: ${e.message}`, 'err');
+    btn.innerHTML = '🎤 Tap to Speak!';
+    btn.disabled = false;
+  }
+}
+
+function stopNow() {
+  if (currentAudio) {
+    log('Stopping audio', 'info');
+    currentAudio.pause();
+    currentAudio.src = '';
+    currentAudio = null;
+  }
+  stopLipSync();
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('speakBtn').disabled = false;
+  document.getElementById('speakBtn').innerHTML = '🎤 Tap to Speak!';
+}
+
+// ── Lip sync ──
+function startLipSync() {
+  document.getElementById('mouseWrap').classList.add('speaking');
+  document.getElementById('mSmile').style.display = 'none';
+  document.getElementById('mOpen').style.display = 'block';
+  mouthPhase = 0;
+  clearInterval(lipInterval);
+  lipInterval = setInterval(() => {
+    mouthPhase += 0.42;
+    const ry = Math.abs(Math.sin(mouthPhase)) * 10 + 0.8;
+    document.getElementById('mEll').setAttribute('ry', ry.toFixed(1));
+    document.getElementById('mEll').setAttribute('cy', (130 + ry * 0.45).toFixed(1));
+  }, 70);
+}
+function stopLipSync() {
+  clearInterval(lipInterval);
+  document.getElementById('mouseWrap').classList.remove('speaking');
+  document.getElementById('mSmile').style.display = 'block';
+  document.getElementById('mOpen').style.display = 'none';
+}
+</script>
+
+</body>
+</html>
